@@ -11,54 +11,66 @@ buildscript {
         }
     }
     dependencies {
-        classpath "net.minecraftforge.gradle:ForgeGradle:2.3-SNAPSHOT"
-        classpath "org.spongepowered:mixingradle:0.6-SNAPSHOT"
+        classpath "net.minecraftforge.gradle:ForgeGradle:3+"
+        classpath "org.spongepowered:mixingradle:0.7-SNAPSHOT"
         classpath "com.github.jengelman.gradle.plugins:shadow:4.0.4"
     }
 }
-apply plugin: "net.minecraftforge.gradle.forge"
+apply plugin: "net.minecraftforge.gradle"
 apply plugin: "org.spongepowered.mixin"
 apply plugin: "com.github.johnrengelman.shadow"
 
 version = aresForgeVersion
 
 minecraft {
-    version = project.forgeVersion
-    mappings = project.mcpVersion
-    runDir = "run"
-    coreMod = "dev.tigr.ares.forge.mixin.MixinLoader"
-    makeObfSourceJar = false
+    mappings channel: "$project.mcpChannel", version: "$project.mcpVersion"
 }
 
 dependencies {
-    compile project(":ares-core")
+    // minecraftforge dependency
+    minecraft "net.minecraftforge:forge:1.12.2-14.23.5.2854"
 
-    //mixin needs to be distributed with the mod, very important
-    compile("org.spongepowered:mixin:0.7.11-SNAPSHOT") {
+    // ares core
+    implementation project(":ares-core")
+    shadow(project(":ares-core")) {
+        exclude group: "org.apache.logging.log4j", module: "log4j-api"
+        exclude group: "com.mojang", module: "brigadier"
+        exclude group: "com.google.guava", module: "guava"
+    }
+
+    // shadow ares core deps
+    shadow "com.mojang:brigadier:1.0.17"
+    shadow "com.github.Vatuu:discord-rpc:1.6.2"
+
+    // mixins
+    implementation "org.spongepowered:mixin:0.7.11-SNAPSHOT"
+    shadow("org.spongepowered:mixin:0.7.11-SNAPSHOT") {
         exclude module: "launchwrapper"
         exclude module: "guava"
         exclude module: "gson"
         exclude module: "commons-io"
+        exclude module: "log4j-core"
+    }
+    annotationProcessor("org.spongepowered:mixin:0.8.2:processor") {
+        exclude module: "gson"
     }
 
-    compile "com.mojang:brigadier:1.0.17"
-    compile "com.github.Vatuu:discord-rpc:1.6.2"
-
-    compile "com.github.cabaletta:baritone:1.2.14"
-    compile "cabaletta:baritone-api:1.2"
+    // baritone
+    implementation "com.github.cabaletta:baritone:1.2.14"
+    implementation "cabaletta:baritone-api:1.2"
+    shadow "cabaletta:baritone-api:1.2"
 }
 
 processResources {
     // this will ensure that this task is redone when the versions change.
     inputs.property "version", project.version
-    inputs.property "mcversion", project.minecraft.version
 
     // replace stuff in mcmod.info, nothing else
     from(sourceSets.main.resources.srcDirs) {
         include "mcmod.info"
 
         // replace version and mcversion
-        expand "version": project.version, "mcversion": project.minecraft.version
+        expand "version": project.version
     }
 
     // copy everything else, thats not the mcmod.info
@@ -68,31 +80,19 @@ processResources {
 }
 
 shadowJar {
-    dependencies {
-        include(dependency(":ares-core"))
-        include(dependency("org.spongepowered:mixin"))
-        include(dependency("net.jodah:typetools"))
-        include(dependency("org.yaml:snakeyaml"))
-        include(dependency("org.javassist:javassist"))
-        include(dependency("com.mojang:brigadier"))
-        include(dependency("dev.tigr:simpleevents"))
-        include(dependency("org.json:json"))
-        include(dependency("com.github.Vatuu:discord-rpc"))
-        include(dependency("cabaletta:baritone-api"))
-    }
-    exclude "dummyThing"
-    exclude "LICENSE.txt"
+    configurations = [project.configurations.shadow]
+    exclude("dummyThing")
+    exclude("LICENSE.txt")
     setClassifier("release")
 }
 
 mixin {
-    defaultObfuscationEnv searge
+    defaultObfuscationEnv "searge"
     add sourceSets.main, "mixins.ares.refmap.json"
 }
 
 reobf {
     shadowJar {
-        mappingType = "SEARGE"
         classpath = sourceSets.main.compileClasspath
     }
 }
